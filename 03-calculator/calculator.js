@@ -1,97 +1,94 @@
-let runningTotal = 0;
-let buffer = "0";
-let previousOperator;
 const screen = document.querySelector(".screen");
 
-function buttonClick(value) {
-  if (isNaN(parseInt(value))) {
-    handleSymbol(value);
-  } else {
-    handleNumber(value);
-  }
-  rerender();
-}
+const initState = {
+  displayValue: "0",
+  clearDisplay: false,
+  operator: null,
+  values: [0, 0],
+  currentIndex: 0,
+};
 
-function handleNumber(value) {
-  if (buffer === "0") {
-    buffer = value;
-  } else {
-    buffer += value;
-  }
-}
+let currentState = { ...initState };
 
-function handleMath(value) {
-  if (buffer === "0") {
-    // do nothing
+const setState = (newState, rerender) => {
+  currentState = { ...currentState, ...newState };
+  if (rerender) screen.innerText = currentState.displayValue;
+};
+
+const clearMemory = () => setState({ ...initState }, true);
+
+const wipeDigit = () => {
+  let { displayValue } = currentState;
+  const displayLenght = displayValue.length;
+  displayValue =
+    displayLenght === 1 ? "0" : displayValue.slice(0, displayLenght - 1);
+
+  setState({ displayValue }, true);
+};
+
+const setOperation = (operator) => {
+  let { currentIndex, values } = currentState;
+  if (currentIndex === 0) {
+    currentIndex++;
+    setState({ currentIndex, operator, clearDisplay: true });
     return;
   }
 
-  const intBuffer = parseInt(buffer);
-  if (runningTotal === 0) {
-    runningTotal = intBuffer;
+  const equals = operator === "=";
+  const currentOperator = currentState.operator;
+
+  values[0] = eval(`${values[0]} ${currentOperator} ${values[1]}`);
+  values[1] = 0;
+
+  setState(
+    {
+      displayValue: values[0],
+      clearDisplay: !equals,
+      operator: equals ? null : operator,
+      values,
+      currentIndex: equals ? 0 : 1,
+    },
+    true
+  );
+};
+
+const addDigit = (digit) => {
+  if (digit === "." && currentState.displayValue.includes(".")) {
+    return;
+  }
+
+  const isClearDisplay =
+    currentState.displayValue === "0" || currentState.clearDisplay;
+  const currentValue = isClearDisplay ? "" : currentState.displayValue;
+  const displayValue = currentValue + digit;
+  setState({ displayValue, clearDisplay: false }, true);
+
+  if (digit !== ".") {
+    const { currentIndex, values } = currentState;
+    values[currentIndex] = parseFloat(displayValue);
+    setState({ values });
+  }
+};
+
+const handleButton = (value) => {
+  const isSymbol = isNaN(parseInt(value)) && value !== ".";
+  if (!isSymbol) {
+    addDigit(value);
+  } else if (value === "c") {
+    clearMemory();
+  } else if (value === "←") {
+    wipeDigit();
   } else {
-    flushOperation(intBuffer);
+    const symbols = {
+      "÷": "/",
+      "×": "*",
+      "-": "-",
+      "+": "+",
+    };
+    setOperation(symbols[value]);
   }
+};
 
-  previousOperator = value;
-
-  buffer = "0";
-}
-
-function flushOperation(intBuffer) {
-  if (previousOperator === "+") {
-    runningTotal += intBuffer;
-  } else if (previousOperator === "-") {
-    runningTotal -= intBuffer;
-  } else if (previousOperator === "×") {
-    runningTotal *= intBuffer;
-  } else {
-    runningTotal /= intBuffer;
-  }
-}
-
-function handleSymbol(value) {
-  switch (value) {
-    case "C":
-      buffer = "0";
-      runningTotal = 0;
-      break;
-    case "=":
-      if (previousOperator === null) {
-        // need two numbers to do math
-        return;
-      }
-      flushOperation(parseInt(buffer));
-      previousOperator = null;
-      buffer = +runningTotal;
-      runningTotal = 0;
-      break;
-    case "←":
-      if (buffer.length === 1) {
-        buffer = "0";
-      } else {
-        buffer = buffer.substring(0, buffer.length - 1);
-      }
-      break;
-    case "+":
-    case "-":
-    case "×":
-    case "÷":
-      handleMath(value);
-      break;
-  }
-}
-
-function rerender() {
-  screen.innerText = buffer;
-}
-
-function init() {
-  document
-    .querySelector(".calc-buttons")
-    .addEventListener("click", function (event) {
-      buttonClick(event.target.innerText);
-    });
-}
-
-init();
+document
+  .querySelector(".calc-buttons")
+  .addEventListener("click", (e) => handleButton(e.target.innerText));
